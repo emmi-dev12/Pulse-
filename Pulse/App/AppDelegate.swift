@@ -3,6 +3,7 @@ import SwiftUI
 import AVFoundation
 import Combine
 
+@MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
     let coordinator = RecordingCoordinator()
     let pillViewModel = PillViewModel()

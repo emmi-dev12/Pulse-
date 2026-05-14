@@ -9,12 +9,15 @@ final class PillViewModel: ObservableObject {
     private var animationTimer: Timer?
     private var audioRecorder: AudioRecorder?
     private var cancellables = Set<AnyCancellable>()
+    private var animationPhase: Float = 0
 
     func bind(to recorder: AudioRecorder) {
         audioRecorder = recorder
         recorder.$averagePower
             .receive(on: RunLoop.main)
-            .sink { [weak self] power in self?.updateAmplitudes(power: power) }
+            .sink { [weak self] power in
+                Task { @MainActor [weak self] in self?.updateAmplitudes(power: power) }
+            }
             .store(in: &cancellables)
     }
 
@@ -42,18 +45,22 @@ final class PillViewModel: ObservableObject {
 
     private func startIdleAnimation() {
         guard animationTimer == nil else { return }
-        var phase: Float = 0
+        animationPhase = 0
         animationTimer = Timer.scheduledTimer(withTimeInterval: 0.08, repeats: true) { [weak self] _ in
-            phase += 0.3
-            let center: Float = 0.3 + 0.15 * sin(phase)
-            self?.barAmplitudes = [
-                0.15 + 0.1 * sin(phase + 1.0),
-                0.2  + 0.15 * sin(phase + 0.5),
-                center,
-                0.2  + 0.15 * sin(phase - 0.5),
-                0.15 + 0.1 * sin(phase - 1.0)
-            ]
+            Task { @MainActor [weak self] in self?.tickIdleAnimation() }
         }
+    }
+
+    private func tickIdleAnimation() {
+        animationPhase += 0.3
+        let p = animationPhase
+        barAmplitudes = [
+            0.15 + 0.1  * sin(p + 1.0),
+            0.2  + 0.15 * sin(p + 0.5),
+            0.3  + 0.15 * sin(p),
+            0.2  + 0.15 * sin(p - 0.5),
+            0.15 + 0.1  * sin(p - 1.0)
+        ]
     }
 
     private func stopAnimation() {
