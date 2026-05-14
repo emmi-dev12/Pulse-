@@ -11,7 +11,8 @@ final class GlobalHotKeyManager {
     private var accessibilityCheckTimer: Timer?
 
     func start() {
-        if AXIsProcessTrustedWithOptions([kAXTrustedCheckOptionPrompt: true] as CFDictionary) {
+        let opts = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true] as CFDictionary
+        if AXIsProcessTrustedWithOptions(opts) {
             installTap()
         } else {
             scheduleAccessibilityCheck()

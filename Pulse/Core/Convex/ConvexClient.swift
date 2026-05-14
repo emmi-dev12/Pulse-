@@ -27,13 +27,14 @@ final class ConvexClient: ObservableObject {
     // MARK: - Public API
 
     func fetchTranscriptions() async {
-        guard let records = try? await query(path: "transcriptions:list", args: ["limit": 100]) as [TranscriptionRecord]? else {
+        do {
+            let records: [TranscriptionRecord] = try await query(path: "transcriptions:list", args: ["limit": 100]) ?? []
+            lastSuccessfulPollTime = Date()
+            isOnline = true
+            onTranscriptionsUpdated?(records)
+        } catch {
             await checkOnlineStatus()
-            return
         }
-        lastSuccessfulPollTime = Date()
-        isOnline = true
-        onTranscriptionsUpdated?(records ?? [])
     }
 
     func insertTranscription(text: String, deviceId: String, createdAt: Double, duration: Double?) async throws -> String {
