@@ -52,12 +52,31 @@ final class ConvexClient: ObservableObject {
     }
 
     func testConnection() async -> Bool {
-        do {
-            let _: [TranscriptionRecord]? = try await query(path: "transcriptions:list", args: ["limit": 1])
-            return true
-        } catch {
-            return false
+        guard let urlString = keychain.load(.convexURL),
+              let deployKey = keychain.load(.convexDeployKey),
+              let url = URL(string: urlString + "/api/query") else { return false }
+
+        var request = URLRequest(url: url, timeoutInterval: 10)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue("Convex \(deployKey)", forHTTPHeaderField: "Authorization")
+        request.httpBody = try? JSONSerialization.data(withJSONObject: [
+            "path": "transcriptions:list",
+            "args": ["limit": 1],
+            "format": "json"
+        ])
+
+        guard let (data, response) = try? await URLSession.shared.data(for: request),
+              let http = response as? HTTPURLResponse else { return false }
+
+        if http.statusCode == 401 { return false }
+
+        if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+            if (json["status"] as? String) == "success" { return true }
+            // "Could not find public function" means credentials are valid, backend not deployed yet
+            if let msg = json["errorMessage"] as? String, msg.contains("Could not find") { return true }
         }
+        return http.statusCode < 500
     }
 
     // MARK: - HTTP Internals
@@ -72,7 +91,7 @@ final class ConvexClient: ObservableObject {
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue("Convex \(deployKey)", forHTTPHeaderField: "Authorization")
-        request.httpBody = try JSONSerialization.data(withJSONObject: ["path": path, "args": args])
+        request.httpBody = try JSONSerialization.data(withJSONObject: ["path": path, "args": args, "format": "json"])
 
         let (data, _) = try await URLSession.shared.data(for: request)
         let response = try JSONDecoder().decode(ConvexQueryResponse<T>.self, from: data)
@@ -93,7 +112,7 @@ final class ConvexClient: ObservableObject {
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue("Convex \(deployKey)", forHTTPHeaderField: "Authorization")
-        request.httpBody = try JSONSerialization.data(withJSONObject: ["path": path, "args": args])
+        request.httpBody = try JSONSerialization.data(withJSONObject: ["path": path, "args": args, "format": "json"])
 
         let (data, _) = try await URLSession.shared.data(for: request)
         let response = try JSONDecoder().decode(ConvexMutationResponse.self, from: data)
