@@ -62,10 +62,12 @@ struct OnboardingPageConvex: View {
         isTesting = true
         testResult = nil
 
-        // Temporarily save to keychain for the test
+        let trimmedURL = convexURL.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmedKey = deployKey.trimmingCharacters(in: .whitespacesAndNewlines)
+
         let keychain = KeychainService()
-        keychain.save(convexURL, for: .convexURL)
-        keychain.save(deployKey, for: .convexDeployKey)
+        keychain.save(trimmedURL, for: .convexURL)
+        keychain.save(trimmedKey, for: .convexDeployKey)
 
         let client = ConvexClient()
         let success = await client.testConnection()
