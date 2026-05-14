@@ -1,0 +1,140 @@
+name: Build & Release
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build Universal DMG
+    runs-on: macos-14          # Apple Silicon runner (supports both archs)
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Select Xcode
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: "15"
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Generate Xcode project
+        run: xcodegen generate
+
+      # ── Build arm64 ──────────────────────────────────────────────────────────
+      - name: Build arm64
+        run: |
+          xcodebuild archive \
+            -project Pulse.xcodeproj \
+            -scheme Pulse \
+            -configuration Release \
+            -archivePath "${{ runner.temp }}/Pulse-arm64.xcarchive" \
+            -destination "generic/platform=macOS,variant=Mac Catalyst" \
+            ARCHS=arm64 \
+            ONLY_ACTIVE_ARCH=NO \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO \
+            SKIP_INSTALL=NO \
+            BUILD_LIBRARY_FOR_DISTRIBUTION=YES
+
+      # ── Build x86_64 ─────────────────────────────────────────────────────────
+      - name: Build x86_64
+        run: |
+          xcodebuild archive \
+            -project Pulse.xcodeproj \
+            -scheme Pulse \
+            -configuration Release \
+            -archivePath "${{ runner.temp }}/Pulse-x86_64.xcarchive" \
+            -destination "generic/platform=macOS,variant=Mac Catalyst" \
+            ARCHS=x86_64 \
+            ONLY_ACTIVE_ARCH=NO \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO \
+            SKIP_INSTALL=NO \
+            BUILD_LIBRARY_FOR_DISTRIBUTION=YES
+
+      # ── Create Universal Binary ───────────────────────────────────────────────
+      - name: Create Universal Binary via lipo
+        run: |
+          ARM_APP="${{ runner.temp }}/Pulse-arm64.xcarchive/Products/Applications/Pulse.app"
+          X86_APP="${{ runner.temp }}/Pulse-x86_64.xcarchive/Products/Applications/Pulse.app"
+          UNIVERSAL_APP="${{ runner.temp }}/Pulse.app"
+
+          cp -R "$ARM_APP" "$UNIVERSAL_APP"
+
+          lipo -create \
+            "$ARM_APP/Contents/MacOS/Pulse" \
+            "$X86_APP/Contents/MacOS/Pulse" \
+            -output "$UNIVERSAL_APP/Contents/MacOS/Pulse"
+
+          echo "Architectures in universal binary:"
+          lipo -info "$UNIVERSAL_APP/Contents/MacOS/Pulse"
+
+      # ── Ad-hoc Sign ───────────────────────────────────────────────────────────
+      - name: Ad-hoc sign
+        run: |
+          codesign --force --deep --sign - \
+            "${{ runner.temp }}/Pulse.app"
+
+      # ── Package as DMG ────────────────────────────────────────────────────────
+      - name: Install create-dmg
+        run: brew install create-dmg
+
+      - name: Create DMG
+        run: |
+          create-dmg \
+            --volname "Pulse" \
+            --volicon "${{ runner.temp }}/Pulse.app/Contents/Resources/AppIcon.icns" \
+            --window-pos 200 120 \
+            --window-size 660 400 \
+            --icon-size 160 \
+            --icon "Pulse.app" 180 170 \
+            --hide-extension "Pulse.app" \
+            --app-drop-link 480 170 \
+            --background ".github/assets/dmg-background.png" \
+            --no-internet-enable \
+            "${{ runner.temp }}/Pulse-${{ github.ref_name }}.dmg" \
+            "${{ runner.temp }}/Pulse.app" || \
+          create-dmg \
+            --volname "Pulse" \
+            --window-pos 200 120 \
+            --window-size 560 320 \
+            --icon-size 128 \
+            --icon "Pulse.app" 140 160 \
+            --hide-extension "Pulse.app" \
+            --app-drop-link 420 160 \
+            --no-internet-enable \
+            "${{ runner.temp }}/Pulse-${{ github.ref_name }}.dmg" \
+            "${{ runner.temp }}/Pulse.app"
+          # The second invocation runs if the first fails (missing background image).
+
+      # ── Upload as GitHub Release ──────────────────────────────────────────────
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: "Pulse ${{ github.ref_name }}"
+          draft: false
+          prerelease: ${{ contains(github.ref_name, '-beta') || contains(github.ref_name, '-rc') }}
+          generate_release_notes: true
+          files: |
+            ${{ runner.temp }}/Pulse-${{ github.ref_name }}.dmg
+          body: |
+            ## Install
+
+            1. Download **Pulse-${{ github.ref_name }}.dmg**
+            2. Open the DMG, drag Pulse to Applications
+            3. On first launch: right-click → Open (bypasses Gatekeeper for unsigned builds)
+            4. Complete the onboarding wizard (Convex URL, Composio key, permissions)
+
+            ## Requirements
+            - macOS 14 Sonoma or later
+            - Intel or Apple Silicon Mac (universal binary)
