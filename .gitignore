@@ -1,0 +1,28 @@
+# Xcode
+*.xcodeproj/
+*.xcworkspace/
+xcuserdata/
+DerivedData/
+build/
+*.ipa
+*.dSYM.zip
+*.dSYM
+
+# Swift Package Manager
+.build/
+.swiftpm/
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Node / Convex
+node_modules/
+convex/_generated/
+.env.local
+.env
+
+# Credentials — never commit
+*.p12
+*.mobileprovision

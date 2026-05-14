@@ -1,0 +1,47 @@
+name: Pulse
+options:
+  bundleIdPrefix: com.pulse
+  deploymentTarget:
+    macOS: "14.0"
+  xcodeVersion: "15.0"
+  generateEmptyDirectories: false
+  createIntermediateGroups: true
+
+settings:
+  base:
+    SWIFT_VERSION: "5.9"
+    MACOSX_DEPLOYMENT_TARGET: "14.0"
+    PRODUCT_BUNDLE_IDENTIFIER: com.pulse.app
+    CODE_SIGN_STYLE: Automatic
+    DEVELOPMENT_TEAM: ""
+    ENABLE_HARDENED_RUNTIME: YES
+    CODE_SIGN_ENTITLEMENTS: Pulse.entitlements
+    INFOPLIST_FILE: Pulse/Info.plist
+    SWIFT_STRICT_CONCURRENCY: minimal
+    OTHER_SWIFT_FLAGS: ""
+
+targets:
+  Pulse:
+    type: application
+    platform: macOS
+    sources:
+      - path: Pulse
+        excludes:
+          - "**/*.md"
+    entitlements:
+      path: Pulse.entitlements
+    info:
+      path: Pulse/Info.plist
+      properties:
+        CFBundleName: Pulse
+        CFBundleDisplayName: Pulse
+        CFBundleShortVersionString: "1.0"
+        CFBundleVersion: "1"
+        LSMinimumSystemVersion: "14.0"
+        LSUIElement: true
+        NSMicrophoneUsageDescription: "Pulse records audio to transcribe your speech into text."
+        NSAccessibilityUsageDescription: "Pulse injects transcribed text into the focused field."
+        NSAppleEventsUsageDescription: "Pulse uses Apple Events to detect the focused application."
+        NSHumanReadableCopyright: ""
+    scheme:
+      testTargets: []
