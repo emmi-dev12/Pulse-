@@ -86,6 +86,7 @@ jobs:
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ env.VERSION }}
           name: "Pulse ${{ env.VERSION }}"
           draft: false
           prerelease: ${{ contains(env.VERSION, '-beta') || contains(env.VERSION, '-rc') }}
